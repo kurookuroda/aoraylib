@@ -9,7 +9,7 @@ Python + raylib (pyray) で実装されています。
 - 日本語フォント対応（PixelMplus 10px / 12px）
 - ページ分割表示
 - 効果音（自動生成されるタイピング音）
-- ゲームパッ対応
+- ゲームパッド対応
 - 高速送り（長押し）
 
 ## ファイル構成
@@ -35,6 +35,29 @@ pyray
 
 ```bash
 pip install -r requirements.txt
+```
+
+## Linux での実行準備
+
+raylib は以下のシステムライブラリに依存します。通常のデスクトップ環境では既に入っていることが多いですが、ない場合は事前にインストールしてください。
+
+### Ubuntu / Debian
+
+```bash
+sudo apt update
+sudo apt install libgl1-mesa-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev
+```
+
+### Fedora
+
+```bash
+sudo dnf install mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel libXcursor-devel
+```
+
+### Arch Linux
+
+```bash
+sudo pacman -S mesa libx11 libxrandr libxi libxcursor
 ```
 
 ## 実行
@@ -69,7 +92,7 @@ python reader.py
 
 ## フォントについて
 
-`fonts/` ディクトリに以下の2種類のフォントを配置してください。
+`fonts/` ディレクトリに以下の2種類のフォントを配置してください。
 
 - `PixelMplus10-Regular.ttf`
 - `PixelMplus12-Regular.ttf`
@@ -93,7 +116,17 @@ pyinstaller --onefile --windowed \
   reader.py
 ```
 
-## 注意
+### Linux 配布に関する注意
+
+PyInstaller は Python コードと `libraylib.so` をバンドルできますが、OpenGL / X11 / glibc などの低層システムライブラリはバンドルできません。配布先のマシンには以下が必要です。
+
+- OpenGL（Mesa）
+- X11 または Wayland
+- glibc 2.31 以上（Ubuntu 20.04 相当以降）
+
+同じ系統のディストリビューション間であれば概ね動作します。古いディストリビューションは glibc の互換性エラーが出ることがあります。
+
+## その他の注意
 
 - 初回実行時に `typing_click.wav` が自動生成されます。
 - フォントが見つからない場合はデフォルトフォントにフォールバックしますが、日本語は正しく表示されません。
