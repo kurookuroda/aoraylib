@@ -35,41 +35,61 @@ COLOR_FAST    = Color(100, 255, 100, 255)
 class SoundManager:
     def __init__(self):
         self.audio_ready = False
-        self.typing_sound = None
+        self.talk_sound = None
         self.sound_cooldown = 0
         self._init_audio()
 
     def _init_audio(self):
         try:
             init_audio_device()
-            self._generate_typing_sound("typing_click.wav")
-            self.typing_sound = load_sound("typing_click.wav")
+            self._generate_talk_sound("talk_blip.wav")
+            self.talk_sound = load_sound("talk_blip.wav")
             self.audio_ready = True
             print("[INFO] Audio initialized.")
         except Exception as e:
             print(f"[WARN] Audio init failed: {e}")
             self.audio_ready = False
 
-    def _generate_typing_sound(self, path: str):
+    def _generate_talk_sound(self, path: str):
+        """
+        ファミコン風テキスト送り音（ポートピア/ドラクエ系）
+        短い方形波 + 急減衰 + わずかな音程下げで「ピポッ」感を出す
+        """
         sample_rate = 44100
-        duration = 0.035
-        freq = 900
+        duration = 0.025          # 25ms とても短い
+        base_freq = 1400          # 基本周波数（高めの「ピ」）
+        bend_amount = 600         # 減衰中に下がる周波数量
         samples = int(sample_rate * duration)
+
         with wave.open(path, 'w') as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(sample_rate)
             for i in range(samples):
                 t = i / sample_rate
-                sine = 0.4 * math.exp(-t * 90) * math.sin(2 * math.pi * freq * t)
-                noise = (random.random() * 2 - 1) * 0.12 * math.exp(-t * 140)
-                val = max(-1.0, min(1.0, sine + noise))
+                progress = t / duration
+
+                # 周波数を少し下げる（「ピ」→「ポ」感）
+                freq = base_freq - (bend_amount * progress)
+
+                # 方形波（square wave）
+                phase = (t * freq) % 1.0
+                square = 1.0 if phase < 0.5 else -1.0
+
+                # 急激な減衰（最初だけ音が出てすぐ消える）
+                envelope = math.exp(-t * 180)
+
+                # わずかなノイズを混ぜてファミコンらしさを出す（0.05程度）
+                noise = (random.random() * 2 - 1) * 0.05 * envelope
+
+                val = square * envelope * 0.5 + noise
+                val = max(-1.0, min(1.0, val))
                 w.writeframes(struct.pack('<h', int(val * 32767)))
 
-    def play_typing(self):
-        if self.audio_ready and self.sound_cooldown <= 0 and is_sound_ready(self.typing_sound):
-            play_sound(self.typing_sound)
-            self.sound_cooldown = 3
+    def play_talk(self):
+        if self.audio_ready and self.sound_cooldown <= 0 and is_sound_ready(self.talk_sound):
+            play_sound(self.talk_sound)
+            self.sound_cooldown = 2
 
     def update(self):
         if self.sound_cooldown > 0:
@@ -77,8 +97,8 @@ class SoundManager:
 
     def cleanup(self):
         if self.audio_ready:
-            if is_sound_ready(self.typing_sound):
-                unload_sound(self.typing_sound)
+            if is_sound_ready(self.talk_sound):
+                unload_sound(self.talk_sound)
             close_audio_device()
 
 
@@ -333,13 +353,13 @@ class App:
             if self.input.fast_mode:
                 self.page_revealed[self.current_page] += 1
                 if self.page_revealed[self.current_page] % 4 == 0:
-                    self.sound.play_typing()
+                    self.sound.play_talk()
             else:
                 self.timer += 1
                 if self.timer >= self.char_interval:
                     self.timer = 0
                     self.page_revealed[self.current_page] += 1
-                    self.sound.play_typing()
+                    self.sound.play_talk()
 
         if self.input.fast_mode and self.page_revealed[self.current_page] >= page['total']:
             self.page_revealed[self.current_page] = page['total']
