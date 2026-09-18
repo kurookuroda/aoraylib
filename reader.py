@@ -76,10 +76,10 @@ class SoundManager:
                 phase = (t * freq) % 1.0
                 square = 1.0 if phase < 0.5 else -1.0
 
-                # 急激な減衰（最初だけ音が出てすぐ消える）
+                # 急激な減衰（最初だけ音が出てすぐ消える
                 envelope = math.exp(-t * 180)
 
-                # わずかなノイズを混ぜてファミコンらしさを出す（0.05程度）
+                # わずかなノイズを混ぜてファミコンらしさを出す
                 noise = (random.random() * 2 - 1) * 0.05 * envelope
 
                 val = square * envelope * 0.5 + noise
@@ -196,7 +196,7 @@ class App:
         self.font_size = 12
         self.font_paths = {10: FONT_PATH_10, 12: FONT_PATH_12}
 
-        self.setup_font_and_layout(12)
+        self.setup_font_and_layout(12, preserve_progress=False)
 
         self.state = "reading"
         self.timer = 0
@@ -204,7 +204,9 @@ class App:
         self.page_cooldown = 0
         self.blink_timer = 0
 
-    def setup_font_and_layout(self, size: int):
+    def setup_font_and_layout(self, size: int, preserve_progress: bool = True):
+        """フォントサイズ変更時のレイアウト再構築。既読進捗は可能な範囲で維持する。"""
+        # 既存カスタムフォントを解放
         if self.using_custom_font and hasattr(self, 'font') and self.font is not None:
             try:
                 unload_font(self.font)
@@ -225,10 +227,16 @@ class App:
         self.pages = self.build_pages()
 
         old_page = getattr(self, 'current_page', 0)
-        self.page_revealed = [0] * len(self.pages)
-        self.current_page = min(old_page, len(self.pages) - 1)
+        new_total = len(self.pages)
+        self.current_page = min(old_page, new_total - 1)
         if self.current_page < 0:
             self.current_page = 0
+
+        self.page_revealed = [0] * new_total
+        if preserve_progress and hasattr(self, 'pages'):
+            # 現在ページより前は全表示済みにする
+            for i in range(self.current_page):
+                self.page_revealed[i] = self.pages[i]['total']
 
     def load_japanese_font(self, path, size):
         if not os.path.exists(path):
@@ -322,7 +330,7 @@ class App:
     def toggle_font_size(self):
         new_size = 10 if self.font_size == 12 else 12
         print(f"[INFO] Switching font size to {new_size}px")
-        self.setup_font_and_layout(new_size)
+        self.setup_font_and_layout(new_size, preserve_progress=True)
 
     def update(self):
         if window_should_close():
@@ -384,6 +392,8 @@ class App:
         if self.input.is_back_pressed():
             if self.current_page > 0:
                 self.current_page -= 1
+                # 元のPyxel版と同様：戻ったページは全表示済みにする
+                self.page_revealed[self.current_page] = self.pages[self.current_page]['total']
                 self.page_cooldown = 8
 
         if self.input.is_next_forced():
@@ -394,6 +404,8 @@ class App:
         if self.input.is_prev_forced():
             if self.current_page > 0:
                 self.current_page -= 1
+                # 強制前ページも全表示済みにする
+                self.page_revealed[self.current_page] = self.pages[self.current_page]['total']
                 self.page_cooldown = 8
 
         if self.input.is_font_toggle_pressed():
